@@ -35,6 +35,11 @@ Full build of Coder, supports the server subcommand.
 		Expected string
 	}{
 		{
+			Name:     "Root version flag",
+			Args:     []string{"--version"},
+			Expected: expectedText,
+		},
+		{
 			Name:     "Defaults to human-readable output",
 			Args:     []string{"version"},
 			Expected: expectedText,
