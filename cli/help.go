@@ -54,6 +54,18 @@ var usageTemplate = func() *template.Template {
 		headerFg = pretty.FgColor(
 			cliui.Color("#337CA0"),
 		)
+		subcommandFg = pretty.FgColor(
+			cliui.Color("#F9A03F"),
+		)
+		typeFg = pretty.FgColor(
+			cliui.Color("#B07BE8"),
+		)
+		envFg = pretty.FgColor(
+			cliui.Color("#E85D75"),
+		)
+		defaultFg = pretty.FgColor(
+			cliui.Color("#8A8F98"),
+		)
 	)
 	return template.Must(
 		template.New("usage").Funcs(
@@ -66,6 +78,21 @@ var usageTemplate = func() *template.Template {
 				"keyword": func(s string) string {
 					txt := pretty.String(s)
 					optionFg.Format(txt)
+					return txt.String()
+				},
+				"envKeyword": func(s string) string {
+					txt := pretty.String(s)
+					envFg.Format(txt)
+					return txt.String()
+				},
+				"typeKeyword": func(s string) string {
+					txt := pretty.String(s)
+					typeFg.Format(txt)
+					return txt.String()
+				},
+				"defaultKeyword": func(s string) string {
+					txt := pretty.String(s)
+					defaultFg.Format(txt)
 					return txt.String()
 				},
 				"prettyHeader": func(s string) string {
@@ -119,15 +146,20 @@ var usageTemplate = func() *template.Template {
 						}
 					}
 
+					// Color the name but compute padding and indentation from the
+					// plain text width.
+					name := pretty.String(cmd.Name())
+					subcommandFg.Format(name)
+
 					var sb strings.Builder
 					_, _ = fmt.Fprintf(
 						&sb, "%s%s%s",
-						strings.Repeat(" ", 4), cmd.Name(), strings.Repeat(" ", maxNameLength-len(cmd.Name())+4),
+						strings.Repeat(" ", 4), name.String(), strings.Repeat(" ", maxNameLength-len(cmd.Name())+4),
 					)
 
 					// This is the point at which indentation begins if there's a
 					// next line.
-					descStart := sb.Len()
+					descStart := 4 + maxNameLength + 4
 
 					twidth := ttyWidth()
 

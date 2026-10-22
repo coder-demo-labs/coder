@@ -39,9 +39,9 @@ coder {{version}}
 	{{- if not (eq $option.FlagShorthand "") }}{{- print "\n "}} {{ keyword "-"}}{{keyword $option.FlagShorthand }}{{", "}}
 	{{- else }}{{- print "\n      " -}}
 	{{- end }}
-    {{- with flagName $option }}{{keyword "--"}}{{ keyword . }}{{ end }} {{- with typeHelper $option }} {{ . }}{{ end }}
-    {{- with envName $option }}, {{ print "$" . | keyword }}{{ end }}
-    {{- with $option.Default }} (default: {{ . }}){{ end }}
+    {{- with flagName $option }}{{keyword "--"}}{{ keyword . }}{{ end }} {{- with typeHelper $option }} {{ typeKeyword . }}{{ end }}
+    {{- with envName $option }}, {{ print "$" . | envKeyword }}{{ end }}
+    {{- with $option.Default }} {{ printf "(default: %s)" . | defaultKeyword }}{{ end }}
         {{- with $option.Description }}
             {{- $desc := $option.Description }}
 {{ indent $desc 10 }}
