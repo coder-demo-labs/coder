@@ -1,0 +1,83 @@
+# When a reviewer requests changes on a Jira-linked PR, send the review
+# feedback to the Jira "PR rework" automation webhook. That rule moves the
+# ticket back to In Progress and fires the Claude scheduled task to address
+# the feedback on the same branch.
+#
+# The Jira key is read from the PR title or head branch (e.g. "CE-13: ..."
+# or "claude/CE-13-colorful-help"). PRs without a key are skipped.
+#
+# Configure under Settings > Secrets and variables > Actions (as a secret
+# or a variable):
+#   JIRA_PR_WEBHOOK   Jira automation incoming webhook URL
+#   JIRA_PR_WORKFLOW  Jira automation webhook token
+name: Review to Jira
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions: {}
+
+jobs:
+  rework:
+    if: github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Send review feedback to Jira
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JIRA_PR_WEBHOOK: ${{ secrets.JIRA_PR_WEBHOOK || vars.JIRA_PR_WEBHOOK }}
+          JIRA_PR_WORKFLOW: ${{ secrets.JIRA_PR_WORKFLOW || vars.JIRA_PR_WORKFLOW }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          REVIEW_ID: ${{ github.event.review.id }}
+          REVIEW_URL: ${{ github.event.review.html_url }}
+          REVIEWER: ${{ github.event.review.user.login }}
+          REVIEW_BODY: ${{ github.event.review.body }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${JIRA_PR_WEBHOOK}" ] || [ -z "${JIRA_PR_WORKFLOW}" ]; then
+            echo "::error::JIRA_PR_WEBHOOK and JIRA_PR_WORKFLOW must be set as repository secrets or variables."
+            exit 1
+          fi
+          echo "::add-mask::${JIRA_PR_WORKFLOW}"
+          echo "::add-mask::${JIRA_PR_WEBHOOK}"
+
+          KEY=$(printf '%s %s' "${PR_TITLE}" "${PR_BRANCH}" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n1 || true)
+          if [ -z "${KEY}" ]; then
+            echo "No Jira key in PR title or branch; skipping."
+            exit 0
+          fi
+
+          INLINE=$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}/comments" \
+            --jq '.[] | "- \(.path):\(.line // .original_line // "?"): \(.body)"')
+
+          jq -n \
+            --arg key "${KEY}" \
+            --arg prUrl "${PR_URL}" \
+            --arg branch "${PR_BRANCH}" \
+            --arg reviewer "${REVIEWER}" \
+            --arg reviewUrl "${REVIEW_URL}" \
+            --arg summary "${REVIEW_BODY}" \
+            --arg inline "${INLINE}" \
+            '{
+              issues: [$key],
+              prUrl: $prUrl,
+              branch: $branch,
+              reviewer: $reviewer,
+              reviewUrl: $reviewUrl,
+              feedback: ([$summary, $inline] | map(select(length > 0)) | join("\n\n"))
+            }' > payload.json
+
+          curl -fsS --retry 3 -X POST "${JIRA_PR_WEBHOOK}" \
+            -H "Content-Type: application/json" \
+            -H "X-Automation-Webhook-Token: ${JIRA_PR_WORKFLOW}" \
+            --data @payload.json
+
+          echo "Sent rework request for ${KEY} (${PR_URL}) to Jira."
