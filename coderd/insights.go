@@ -1,6 +1,7 @@
 package coderd
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
@@ -580,13 +581,18 @@ func (api *API) insightsTemplates(rw http.ResponseWriter, r *http.Request) {
 // convertTemplateInsightsApps lists each session app with usage, followed by
 // the template apps.
 func convertTemplateInsightsApps(usage database.GetTemplateInsightsRow, templateAppUsage []database.GetTemplateAppInsightsRow) ([]codersdk.TemplateAppUsage, error) {
-	sessionAppSeconds, err := codersdk.DecodeAppMap[int64](usage.SessionAppUsageSeconds)
+	// Session apps nest under their connection method.
+	sessionAppSeconds, err := codersdk.DecodeAppMap[map[string]int64](usage.SessionAppUsageSeconds)
 	if err != nil {
 		return nil, xerrors.Errorf("decode session app usage seconds: %w", err)
 	}
-	sessionAppTemplateIDs, err := codersdk.DecodeAppMap[[]uuid.UUID](usage.SessionAppTemplateIds)
+	sessionAppTemplateIDs, err := codersdk.DecodeAppMap[map[string][]uuid.UUID](usage.SessionAppTemplateIds)
 	if err != nil {
 		return nil, xerrors.Errorf("decode session app template ids: %w", err)
+	}
+	sessionFoldedAppCounts, err := codersdk.DecodeAppMap[int64](usage.SessionFoldedAppCounts)
+	if err != nil {
+		return nil, xerrors.Errorf("decode session folded app counts: %w", err)
 	}
 
 	// TODO(mafredri): We could take Web Terminal usage from templateAppUsage since
@@ -596,23 +602,29 @@ func convertTemplateInsightsApps(usage database.GetTemplateInsightsRow, template
 	// condition finding the corresponding app entry in templateAppUsage is:
 	// !app.IsApp && app.AccessMethod == "terminal" && app.SlugOrPort == ""
 	apps := make([]codersdk.TemplateAppUsage, 0, len(sessionAppSeconds)+len(templateAppUsage))
-	for _, appName := range slices.Sorted(maps.Keys(sessionAppSeconds)) {
-		displayName, icon, _ := codersdk.SessionAppPresentation(appName)
-		templateIDs := sessionAppTemplateIDs[appName]
-		if templateIDs == nil {
-			// Keep serializing an empty template list as [] instead of null.
-			templateIDs = []uuid.UUID{}
+	for method, seconds := range sessionAppSeconds {
+		for appName, appSeconds := range seconds {
+			displayName, icon, _ := codersdk.SessionAppPresentation(appName)
+			templateIDs := sessionAppTemplateIDs[method][appName]
+			if templateIDs == nil {
+				// Keep serializing an empty template list as [] instead of null.
+				templateIDs = []uuid.UUID{}
+			}
+			apps = append(apps, codersdk.TemplateAppUsage{
+				TemplateIDs:         templateIDs,
+				Method:              codersdk.ConnectionLogMethod(method),
+				DisplayName:         displayName,
+				Slug:                appName,
+				Icon:                icon,
+				Seconds:             appSeconds,
+				SecondsIsUpperBound: appName == codersdk.AppNameOverflow && sessionFoldedAppCounts[method] > 0,
+			})
 		}
-		apps = append(apps, codersdk.TemplateAppUsage{
-			TemplateIDs:         templateIDs,
-			Method:              sessionAppMethod(appName),
-			DisplayName:         displayName,
-			Slug:                appName,
-			Icon:                icon,
-			Seconds:             sessionAppSeconds[appName],
-			SecondsIsUpperBound: appName == codersdk.AppNameOverflow && usage.SessionFoldedAppCount > 0,
-		})
 	}
+	// Sort by slug, then method, to keep row order independent of map order.
+	slices.SortFunc(apps, func(a, b codersdk.TemplateAppUsage) int {
+		return cmp.Or(strings.Compare(a.Slug, b.Slug), strings.Compare(string(a.Method), string(b.Method)))
+	})
 
 	// Sort here to keep row order independent of the database collation.
 	slices.SortFunc(templateAppUsage, func(a, b database.GetTemplateAppInsightsRow) int {
@@ -633,19 +645,6 @@ func convertTemplateInsightsApps(usage database.GetTemplateInsightsRow, template
 	}
 
 	return apps, nil
-}
-
-// sessionAppMethod derives a session app's method from its name.
-// TODO(EhabY): Store the method instead (#31012).
-func sessionAppMethod(appName string) codersdk.ConnectionLogMethod {
-	switch codersdk.AppFamilyName(appName) {
-	case codersdk.AppFamilyReconnectingPTY:
-		return codersdk.ConnectionLogMethodReconnectingPTY
-	case codersdk.AppFamilyPortForwarding:
-		return codersdk.ConnectionLogMethodPortForwarding
-	default:
-		return codersdk.ConnectionLogMethodSSH
-	}
 }
 
 // parseInsightsStartAndEndTime parses the start and end time query parameters

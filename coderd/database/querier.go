@@ -905,8 +905,9 @@ type sqlcQuerier interface {
 	GetTemplateByID(ctx context.Context, id uuid.UUID) (Template, error)
 	GetTemplateByOrganizationAndName(ctx context.Context, arg GetTemplateByOrganizationAndNameParams) (Template, error)
 	// GetTemplateInsights aggregates workspace usage, including apps.
-	// Session apps are reported individually; excess unregistered apps fold into
-	// overflow. Registered apps and accounting rows do not count toward the limit.
+	// Session apps are reported individually per connection method; each method's
+	// excess unregistered apps fold into its own overflow row. Registered apps and
+	// accounting rows do not count toward the limit.
 	//
 	// Per-user minutes are summed across templates and capped at 30 per half hour,
 	// assuming workspaces were used sequentially rather than concurrently.

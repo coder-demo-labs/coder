@@ -95,7 +95,7 @@ SELECT
 			SELECT
 				sess.app_name,
 				SUM(sess.sessions::bigint) AS app_sessions
-			FROM stats, jsonb_each_text(stats.session_counts) AS sess(app_name, sessions)
+			FROM stats, jsonb_each(stats.session_counts) AS m(method, apps), jsonb_each_text(m.apps) AS sess(app_name, sessions)
 			-- Only the latest row per agent holds current sessions.
 			WHERE stats.rn = 1
 			GROUP BY sess.app_name
@@ -147,7 +147,8 @@ latest_agent_stats AS (
 			AND stats.created_at >= latest_minutes.minute_bucket
 			AND stats.created_at < latest_minutes.minute_bucket + '1 minute'::interval
 			AND stats.usage,
-			jsonb_each_text(stats.session_counts) AS sess(app_name, sessions)
+			jsonb_each(stats.session_counts) AS m(method, apps),
+			jsonb_each_text(m.apps) AS sess(app_name, sessions)
 		GROUP BY sess.app_name
 	) AS app_totals
 )
@@ -173,11 +174,22 @@ WITH agent_stats AS (
 	SELECT *, ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY created_at DESC) AS rn
 	FROM workspace_agent_stats WHERE created_at > $1
 ), latest_agent_stats AS (
-	-- rn = 1 leaves one row per agent, and that row's session_counts is
-	-- already the object this query reports, empty map included.
+	-- rn = 1 leaves one row per agent. Its session_counts is grouped by
+	-- method, so sum each app name across methods into the flat object this
+	-- query reports, empty map included.
 	SELECT
 		agent_id,
-		session_counts
+		coalesce((
+			SELECT
+				jsonb_object_agg(app_name, app_sessions)
+			FROM (
+				SELECT
+					sess.app_name,
+					SUM(sess.sessions::bigint) AS app_sessions
+				FROM jsonb_each(latest_stats.session_counts) AS m(method, apps), jsonb_each_text(m.apps) AS sess(app_name, sessions)
+				GROUP BY sess.app_name
+			) AS app_totals
+		), '{}'::jsonb)::jsonb AS session_counts
 	FROM latest_stats
 	WHERE rn = 1
 )
@@ -206,7 +218,7 @@ WITH stats AS (
 			stats.agent_id,
 			sess.app_name,
 			SUM(sess.sessions::bigint) AS app_sessions
-		FROM stats, jsonb_each_text(stats.session_counts) AS sess(app_name, sessions)
+		FROM stats, jsonb_each(stats.session_counts) AS m(method, apps), jsonb_each_text(m.apps) AS sess(app_name, sessions)
 		WHERE stats.in_latest_usage_minute
 		GROUP BY stats.agent_id, sess.app_name
 	) AS app_totals
@@ -248,11 +260,23 @@ WITH agent_stats AS (
 	-- The greater than 0 is to support legacy agents that don't report connection_median_latency_ms.
 	WHERE created_at > $1 AND connection_median_latency_ms > 0
 ), latest_agent_stats AS (
-	-- rn = 1 leaves one row per agent, so the session object, connection
-	-- count, and latency are that row's own columns, empty map included.
+	-- rn = 1 leaves one row per agent, so the connection count and latency
+	-- are that row's own columns. Its session_counts is grouped by method, so
+	-- sum each app name across methods into the flat object, empty map
+	-- included.
 	SELECT
 		agent_id,
-		session_counts,
+		coalesce((
+			SELECT
+				jsonb_object_agg(app_name, app_sessions)
+			FROM (
+				SELECT
+					sess.app_name,
+					SUM(sess.sessions::bigint) AS app_sessions
+				FROM jsonb_each(latest_stats.session_counts) AS m(method, apps), jsonb_each_text(m.apps) AS sess(app_name, sessions)
+				GROUP BY sess.app_name
+			) AS app_totals
+		), '{}'::jsonb)::jsonb AS session_counts,
 		connection_count,
 		connection_median_latency_ms
 	FROM latest_stats
@@ -311,7 +335,7 @@ WITH agent_stats AS (
 			latest_stats.agent_id,
 			sess.app_name,
 			SUM(sess.sessions::bigint) AS app_sessions
-		FROM latest_stats, jsonb_each_text(latest_stats.session_counts) AS sess(app_name, sessions)
+		FROM latest_stats, jsonb_each(latest_stats.session_counts) AS m(method, apps), jsonb_each_text(m.apps) AS sess(app_name, sessions)
 		GROUP BY latest_stats.agent_id, sess.app_name
 	) AS app_totals
 	GROUP BY agent_id

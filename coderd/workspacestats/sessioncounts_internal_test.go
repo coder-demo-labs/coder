@@ -127,3 +127,48 @@ func TestClearSessionCounts(t *testing.T) {
 	require.Empty(t, sessionCountsFromProto(st))
 	require.False(t, HasSessionCounts(st))
 }
+
+func TestMethodSessionCounts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DerivesMethodFromName", func(t *testing.T) {
+		t.Parallel()
+
+		got, overflow := methodSessionCounts(map[string]int64{
+			"vscode":           2,
+			"ssh":              1,
+			"some_new_ide":     3,
+			"reconnecting_pty": 4,
+			"port_forwarding":  5,
+		})
+		require.Zero(t, overflow)
+		require.Equal(t, map[string]map[string]int64{
+			"ssh":              {"vscode": 2, "ssh": 1, "some_new_ide": 3},
+			"reconnecting_pty": {"reconnecting_pty": 4},
+			"port_forwarding":  {"port_forwarding": 5},
+		}, got)
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		t.Parallel()
+
+		got, overflow := methodSessionCounts(nil)
+		require.Zero(t, overflow)
+		require.Empty(t, got)
+	})
+
+	t.Run("CapsEachMethod", func(t *testing.T) {
+		t.Parallel()
+
+		counts := map[string]int64{"port_forwarding": 1}
+		for i := range maxSessionCountEntries + 2 {
+			counts[fmt.Sprintf("app_%03d", i)] = 1
+		}
+		got, overflow := methodSessionCounts(counts)
+		require.Equal(t, 2, overflow)
+		// The ssh apps overflow on their own; the other method is untouched.
+		require.Len(t, got["ssh"], maxSessionCountEntries+1)
+		require.EqualValues(t, 2, got["ssh"][codersdk.AppNameOverflow])
+		require.Equal(t, map[string]int64{"port_forwarding": 1}, got["port_forwarding"])
+	})
+}

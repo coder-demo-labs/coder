@@ -3392,12 +3392,16 @@ CREATE TABLE template_usage_stats_session_apps (
     template_id uuid NOT NULL,
     user_id uuid NOT NULL,
     app_name text NOT NULL,
-    usage_mins smallint NOT NULL
+    usage_mins smallint NOT NULL,
+    method connection_log_method NOT NULL,
+    CONSTRAINT template_usage_stats_session_apps_method_check CHECK ((method = ANY (ARRAY['ssh'::connection_log_method, 'reconnecting_pty'::connection_log_method, 'port_forwarding'::connection_log_method])))
 );
 
 COMMENT ON TABLE template_usage_stats_session_apps IS 'Session usage of each template_usage_stats bucket, split by app name. No row means the bucket recorded no session usage. Reads group app names into families through the codersdk registry.';
 
 COMMENT ON COLUMN template_usage_stats_session_apps.app_name IS 'App name as the agent reported it, so a source label rather than a curated identity. Rows converted from the fixed session columns carry a family name here instead.';
+
+COMMENT ON COLUMN template_usage_stats_session_apps.method IS 'How the client connected. Together with app_name it identifies a session app.';
 
 COMMENT ON COLUMN template_usage_stats_session_apps.usage_mins IS 'Total minutes the user has been using the app. A minute counts once however many sessions were open.';
 
@@ -4004,7 +4008,7 @@ CREATE TABLE workspace_agent_stats (
     session_counts jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
-COMMENT ON COLUMN workspace_agent_stats.session_counts IS 'Positive session counts keyed by the canonical app name reported by the agent.';
+COMMENT ON COLUMN workspace_agent_stats.session_counts IS 'Positive session counts keyed by connection method, then by the canonical app name reported by the agent.';
 
 CREATE TABLE workspace_agent_volume_resource_monitors (
     agent_id uuid NOT NULL,
@@ -4838,7 +4842,7 @@ ALTER TABLE ONLY template_usage_stats
     ADD CONSTRAINT template_usage_stats_pkey PRIMARY KEY (start_time, template_id, user_id);
 
 ALTER TABLE ONLY template_usage_stats_session_apps
-    ADD CONSTRAINT template_usage_stats_session_apps_pkey PRIMARY KEY (start_time, user_id, template_id, app_name);
+    ADD CONSTRAINT template_usage_stats_session_apps_pkey PRIMARY KEY (start_time, user_id, template_id, method, app_name);
 
 ALTER TABLE ONLY template_version_parameters
     ADD CONSTRAINT template_version_parameters_template_version_id_name_key UNIQUE (template_version_id, name);

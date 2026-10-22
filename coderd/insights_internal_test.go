@@ -351,12 +351,16 @@ func TestConvertTemplateInsightsApps(t *testing.T) {
 
 		sharedTemplateID, cursorTemplateID := uuid.New(), uuid.New()
 		apps, err := convertTemplateInsightsApps(database.GetTemplateInsightsRow{
-			SessionAppUsageSeconds: json.RawMessage(`{"vscode": 300, "cursor": 120, "some_new_ide": 60, "overflow": 120, "unknown": 60, "reconnecting_pty": 90, "port_forwarding": 30}`),
-			SessionAppTemplateIds: json.RawMessage(`{
+			SessionAppUsageSeconds: json.RawMessage(`{
+				"ssh": {"vscode": 300, "cursor": 120, "some_new_ide": 60, "overflow": 120, "unknown": 60},
+				"reconnecting_pty": {"reconnecting_pty": 90},
+				"port_forwarding": {"port_forwarding": 30}
+			}`),
+			SessionAppTemplateIds: json.RawMessage(`{"ssh": {
 				"vscode": ["` + sharedTemplateID.String() + `"],
 				"cursor": ["` + sharedTemplateID.String() + `", "` + cursorTemplateID.String() + `"],
 				"some_new_ide": ["` + cursorTemplateID.String() + `"]
-			}`),
+			}}`),
 		}, []database.GetTemplateAppInsightsRow{{
 			TemplateIDs:  []uuid.UUID{sharedTemplateID},
 			Slug:         "filebrowser",
@@ -435,9 +439,12 @@ func TestConvertTemplateInsightsApps(t *testing.T) {
 		// slug, and it is not an accounting row.
 		templateID := uuid.New()
 		apps, err := convertTemplateInsightsApps(database.GetTemplateInsightsRow{
-			SessionAppUsageSeconds: json.RawMessage(`{"overflow": 120, "unknown": 60, "future_ide": 30}`),
+			SessionAppUsageSeconds: json.RawMessage(`{
+				"ssh": {"overflow": 120, "unknown": 60, "future_ide": 30},
+				"port_forwarding": {"overflow": 15}
+			}`),
 			SessionAppTemplateIds:  json.RawMessage(`{}`),
-			SessionFoldedAppCount:  2,
+			SessionFoldedAppCounts: json.RawMessage(`{"ssh": 2}`),
 		}, []database.GetTemplateAppInsightsRow{{
 			TemplateIDs:  []uuid.UUID{templateID},
 			Slug:         codersdk.AppNameOverflow,
@@ -450,10 +457,11 @@ func TestConvertTemplateInsightsApps(t *testing.T) {
 			upperBound[string(app.Method)+"/"+app.Slug] = app.SecondsIsUpperBound
 		}
 		require.Equal(t, map[string]bool{
-			"ssh/future_ide":         false,
-			"ssh/overflow":           true,
-			"ssh/unknown":            false,
-			"workspace_app/overflow": false,
+			"ssh/future_ide":           false,
+			"ssh/overflow":             true,
+			"ssh/unknown":              false,
+			"port_forwarding/overflow": false,
+			"workspace_app/overflow":   false,
 		}, upperBound)
 	})
 
@@ -462,12 +470,12 @@ func TestConvertTemplateInsightsApps(t *testing.T) {
 
 		for name, usage := range map[string]database.GetTemplateInsightsRow{
 			"UsageSeconds": {
-				SessionAppUsageSeconds: json.RawMessage(`{"vscode": {}}`),
+				SessionAppUsageSeconds: json.RawMessage(`{"ssh": {"vscode": {}}}`),
 				SessionAppTemplateIds:  json.RawMessage(`{}`),
 			},
 			"TemplateIDs": {
 				SessionAppUsageSeconds: json.RawMessage(`{}`),
-				SessionAppTemplateIds:  json.RawMessage(`{"vscode": "not-a-uuid"}`),
+				SessionAppTemplateIds:  json.RawMessage(`{"ssh": {"vscode": "not-a-uuid"}}`),
 			},
 		} {
 			t.Run(name, func(t *testing.T) {

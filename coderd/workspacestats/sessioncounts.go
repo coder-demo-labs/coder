@@ -82,6 +82,43 @@ func capSessionCounts(counts map[string]int64) (map[string]int64, int) {
 	return capped, len(overflow)
 }
 
+// sessionAppMethod derives how a session app connected from its normalized
+// name. Every current reporter uses a name that matches its method, and
+// anything else came in over SSH.
+func sessionAppMethod(appName string) codersdk.ConnectionLogMethod {
+	switch codersdk.AppFamilyName(appName) {
+	case codersdk.AppFamilyReconnectingPTY:
+		return codersdk.ConnectionLogMethodReconnectingPTY
+	case codersdk.AppFamilyPortForwarding:
+		return codersdk.ConnectionLogMethodPortForwarding
+	default:
+		return codersdk.ConnectionLogMethodSSH
+	}
+}
+
+// methodSessionCounts returns the per-app session counts grouped by connection
+// method, the shape stored in workspace_agent_stats.session_counts. Each
+// method is capped on its own, so one noisy method cannot push another
+// method's apps into overflow. The second return counts the names summed
+// away.
+func methodSessionCounts(counts map[string]int64) (map[string]map[string]int64, int) {
+	byMethod := make(map[string]map[string]int64)
+	for app, count := range counts {
+		method := string(sessionAppMethod(app))
+		if byMethod[method] == nil {
+			byMethod[method] = make(map[string]int64)
+		}
+		byMethod[method][app] = count
+	}
+	var overflow int
+	for method, apps := range byMethod {
+		capped, n := capSessionCounts(apps)
+		byMethod[method] = capped
+		overflow += n
+	}
+	return byMethod, overflow
+}
+
 // HasSessionCounts reports whether the stats contain any active session.
 func HasSessionCounts(st *agentproto.Stats) bool {
 	return len(normalizedSessionCounts(st)) > 0

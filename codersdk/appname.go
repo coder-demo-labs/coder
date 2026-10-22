@@ -203,9 +203,10 @@ func NormalizeAppName(appName string) string {
 	return strings.ReplaceAll(strings.ToLower(appName), "-", "_")
 }
 
-// appMapValue is what an app-keyed JSONB payload holds.
+// appMapValue is what an app-keyed JSONB payload holds. Session apps of
+// template insights nest under their connection method.
 type appMapValue interface {
-	int64 | []uuid.UUID
+	int64 | []uuid.UUID | map[string]int64 | map[string][]uuid.UUID
 }
 
 // DecodeAppMap decodes an app-keyed JSONB payload. An absent or SQL NULL
