@@ -275,7 +275,8 @@ func TestHealthz(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	assert.Equal(t, "OK", string(body))
+	assert.Equal(t, "application/json", res.Header.Get("Content-Type"))
+	assert.JSONEq(t, `{"ok":true}`, string(body))
 }
 
 // TestAIGatewayDisabledStartupAndShutdown verifies the server starts and
