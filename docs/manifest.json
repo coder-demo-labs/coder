@@ -1809,6 +1809,11 @@
 							"path": "reference/cli/dotfiles.md"
 						},
 						{
+							"title": "`emotion`",
+							"description": "Print the emotion that started the session.",
+							"path": "reference/cli/emotion.md"
+						},
+						{
 							"title": "`external-auth`",
 							"description": "Manage external authentication.",
 							"path": "reference/cli/external-auth/index.md",

@@ -32,6 +32,7 @@ Coder — A tool for provisioning self-hosted development environments with Terr
 |--------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
 | [<code>completion</code>](./completion.md)                         | Install or update shell completion scripts for the detected or chosen shell.                                                 |
 | [<code>dotfiles</code>](./dotfiles.md)                             | Personalize your workspace by applying a canonical dotfiles repository                                                       |
+| [<code>emotion</code>](./emotion.md)                               | Print the emotion that started the session                                                                                   |
 | [<code>external-auth</code>](./external-auth/index.md)             | Manage external authentication                                                                                               |
 | [<code>login</code>](./login/index.md)                             | Authenticate with Coder deployment                                                                                           |
 | [<code>logout</code>](./logout.md)                                 | Unauthenticate your local session                                                                                            |

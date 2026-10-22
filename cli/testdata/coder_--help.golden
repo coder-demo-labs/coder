@@ -23,6 +23,7 @@ SUBCOMMANDS:
     delete             Delete a workspace
     dotfiles           Personalize your workspace by applying a canonical
                        dotfiles repository
+    emotion            Print the emotion that started the session
     external-auth      Manage external authentication
     favorite           Add a workspace to your favorites
     list               List workspaces
