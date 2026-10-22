@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/mitchellh/go-wordwrap"
+	"github.com/muesli/termenv"
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/xerrors"
 
@@ -51,9 +52,15 @@ var usageTemplate = func() *template.Template {
 		optionFg = pretty.FgColor(
 			cliui.Color("#04A777"),
 		)
-		headerFg = pretty.FgColor(
-			cliui.Color("#337CA0"),
-		)
+		// Section headers cycle through a rainbow, one color per letter.
+		rainbow = []termenv.Color{
+			cliui.Color("#FF5F5F"),
+			cliui.Color("#FFAF5F"),
+			cliui.Color("#FFD75F"),
+			cliui.Color("#5FD787"),
+			cliui.Color("#5FAFFF"),
+			cliui.Color("#AF87FF"),
+		}
 	)
 	return template.Must(
 		template.New("usage").Funcs(
@@ -70,9 +77,19 @@ var usageTemplate = func() *template.Template {
 				},
 				"prettyHeader": func(s string) string {
 					s = strings.ToUpper(s)
-					txt := pretty.String(s, ":")
-					headerFg.Format(txt)
-					return txt.String()
+					var sb strings.Builder
+					i := 0
+					for _, r := range s + ":" {
+						if r == ' ' {
+							_, _ = sb.WriteRune(r)
+							continue
+						}
+						_, _ = sb.WriteString(pretty.Sprint(
+							pretty.FgColor(rainbow[i%len(rainbow)]), string(r),
+						))
+						i++
+					}
+					return sb.String()
 				},
 				"typeHelper": func(opt *serpent.Option) string {
 					switch v := opt.Value.(type) {
