@@ -173,6 +173,15 @@ Force the use of a TTY.
 
 Enable verbose output.
 
+### --emotion
+
+| Property    | Value                       |
+|-------------|-----------------------------|
+| Type        | <code>string</code>         |
+| Environment | <code>$CODER_EMOTION</code> |
+
+Change the CLI color theme to match an emotion. Supported emotions: happy, sad.
+
 ### --flight-recorder-size
 
 | Property    | Value                                    |

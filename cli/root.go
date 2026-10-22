@@ -77,6 +77,7 @@ const (
 	varAllowRedirects          = "allow-redirects"
 	varForceTty                = "force-tty"
 	varVerbose                 = "verbose"
+	varEmotion                 = "emotion"
 	varFlightRecorderSize      = "flight-recorder-size"
 	varDisableDirect           = "disable-direct-connections"
 	varDisableNetworkTelemetry = "disable-network-telemetry"
@@ -408,9 +409,9 @@ func (r *RootCmd) Command(subcommands []*serpent.Command) (*serpent.Command, err
 	// the invocation context for every downstream middleware and handler.
 	cmd.Walk(func(cmd *serpent.Command) {
 		if cmd.Middleware == nil {
-			cmd.Middleware = serpent.Chain(clientSessionIDMiddleware(), r.flightRecorderMiddleware(), PrintDeprecatedOptions())
+			cmd.Middleware = serpent.Chain(r.emotionMiddleware(), clientSessionIDMiddleware(), r.flightRecorderMiddleware(), PrintDeprecatedOptions())
 		} else {
-			cmd.Middleware = serpent.Chain(clientSessionIDMiddleware(), r.flightRecorderMiddleware(), cmd.Middleware, PrintDeprecatedOptions())
+			cmd.Middleware = serpent.Chain(r.emotionMiddleware(), clientSessionIDMiddleware(), r.flightRecorderMiddleware(), cmd.Middleware, PrintDeprecatedOptions())
 		}
 	})
 
@@ -492,6 +493,13 @@ func (r *RootCmd) Command(subcommands []*serpent.Command) (*serpent.Command, err
 			Hidden:      false,
 			Description: "Force the use of a TTY.",
 			Value:       serpent.BoolOf(&r.forceTTY),
+			Group:       globalGroup,
+		},
+		{
+			Flag:        varEmotion,
+			Env:         "CODER_EMOTION",
+			Description: "Change the CLI color theme to match an emotion. Supported emotions: happy, sad.",
+			Value:       serpent.StringOf(&r.emotion),
 			Group:       globalGroup,
 		},
 		{
@@ -599,6 +607,7 @@ type RootCmd struct {
 	forceTTY           bool
 	noOpen             bool
 	verbose            bool
+	emotion            string
 	flightRecorderSize int64
 	versionFlag        bool
 	disableDirect      bool
@@ -1900,6 +1909,18 @@ func resolveClientSessionID(inv *serpent.Invocation) (string, error) {
 		return "", xerrors.Errorf("generate client session ID: %w", err)
 	}
 	return id, nil
+}
+
+// emotionMiddleware applies the --emotion theme before the command runs.
+func (r *RootCmd) emotionMiddleware() serpent.MiddlewareFunc {
+	return func(next serpent.HandlerFunc) serpent.HandlerFunc {
+		return func(inv *serpent.Invocation) error {
+			if err := cliui.ApplyEmotion(r.emotion); err != nil {
+				return xerrors.Errorf("apply --%s: %w", varEmotion, err)
+			}
+			return next(inv)
+		}
+	}
 }
 
 // clientSessionIDMiddleware resolves a single client session ID per invocation
