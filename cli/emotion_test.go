@@ -32,7 +32,6 @@ func TestEmotion(t *testing.T) {
 			inv, _ := clitest.New(t, tt.args...)
 			buf := new(bytes.Buffer)
 			inv.Stdout = buf
-			inv.Stderr = buf
 			err := inv.Run()
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
