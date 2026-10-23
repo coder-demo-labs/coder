@@ -20,6 +20,7 @@ func TestEmotion(t *testing.T) {
 	}{
 		{name: "Happy", args: []string{"emotion", "happy"}, expected: "Coder is happy! :D\n"},
 		{name: "Sad", args: []string{"emotion", "sad"}, expected: "Coder is sad. :(\n"},
+		{name: "Perturbed", args: []string{"emotion", "perturbed"}, expected: "Coder is perturbed. :/\n"},
 		{name: "CaseInsensitive", args: []string{"emotion", "HAPPY"}, expected: "Coder is happy! :D\n"},
 		{name: "Unknown", args: []string{"emotion", "angry"}, err: "unknown emotion"},
 		{name: "MissingArg", args: []string{"emotion"}, err: "wanted 1 args"},
