@@ -643,3 +643,27 @@ func TestWrapTransportWithUserAgentHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestRootEmotion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		arg  string
+		want string
+	}{
+		{"happy", "Glad you're happy"},
+		{"sad", "Sorry you're feeling sad"},
+		{"Ambivalent", "Ambivalent? That's okay"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.arg, func(t *testing.T) {
+			t.Parallel()
+			inv, _ := clitest.New(t, tt.arg)
+			buf := new(bytes.Buffer)
+			inv.Stdout = buf
+			err := inv.Run()
+			require.NoError(t, err)
+			require.Contains(t, buf.String(), tt.want)
+		})
+	}
+}
