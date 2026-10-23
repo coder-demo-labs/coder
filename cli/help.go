@@ -120,14 +120,17 @@ var usageTemplate = func() *template.Template {
 					}
 
 					var sb strings.Builder
+					name := pretty.String(cmd.Name())
+					optionFg.Format(name)
 					_, _ = fmt.Fprintf(
 						&sb, "%s%s%s",
-						strings.Repeat(" ", 4), cmd.Name(), strings.Repeat(" ", maxNameLength-len(cmd.Name())+4),
+						strings.Repeat(" ", 4), name.String(), strings.Repeat(" ", maxNameLength-len(cmd.Name())+4),
 					)
 
 					// This is the point at which indentation begins if there's a
-					// next line.
-					descStart := sb.Len()
+					// next line. It is measured in visible columns, so it must
+					// not count the color escape sequences in the name.
+					descStart := 4 + maxNameLength + 4
 
 					twidth := ttyWidth()
 
