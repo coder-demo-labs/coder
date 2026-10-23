@@ -1,0 +1,51 @@
+name: Agent review loop
+on:
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  send-back:
+    if: >-
+      (github.event_name == 'pull_request_review' &&
+       (github.event.review.state == 'changes_requested' || startsWith(github.event.review.body, '/agent')) &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association))
+      ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '/agent') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notes to Jira
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          REVIEW_ID: ${{ github.event.review.id }}
+          BODY: ${{ github.event.review.body || github.event.comment.body }}
+          REVIEWER: ${{ github.event.review.user.login || github.event.comment.user.login }}
+          JIRA_PR_WEBHOOK: ${{ secrets.JIRA_PR_WEBHOOK }}
+          JIRA_PR_WORKFLOW: ${{ secrets.JIRA_PR_WORKFLOW }}
+        run: |
+          set -euo pipefail
+          read -r BRANCH PR_URL <<<"$(gh pr view "$PR" --repo "$REPO" --json headRefName,url --jq '"\(.headRefName) \(.url)"')"
+          case "$BRANCH" in claude/*) ;; *) echo "Not an agent branch: $BRANCH"; exit 0 ;; esac
+          KEY=$(printf '%s' "$BRANCH" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n1 || true)
+          [ -n "$KEY" ] || { echo "No issue key in $BRANCH"; exit 0; }
+          NOTES=${BODY#/agent}
+          if [ "$EVENT" = "pull_request_review" ]; then
+            COMMENTS=$(gh api "repos/$REPO/pulls/$PR/reviews/$REVIEW_ID/comments" \
+              --jq '.[] | "- \(.path) (line \(.line // .original_line // "?")): \(.body)"')
+            NOTES=$(printf '%s\n%s' "$NOTES" "$COMMENTS")
+          fi
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then echo "No notes to send"; exit 0; fi
+          jq -n --arg k "$KEY" --arg u "$PR_URL" --arg b "$BRANCH" --arg r "$REVIEWER" --arg n "$NOTES" \
+            '{issues:[$k],data:{prUrl:$u,branch:$b,reviewer:$r,notes:$n}}' |
+            curl -fsS -X POST "$JIRA_PR_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -H "X-Automation-Webhook-Token: $JIRA_PR_WORKFLOW" \
+              --data @-
