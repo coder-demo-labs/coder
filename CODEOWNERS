@@ -61,6 +61,4 @@ docs/ @nickvigilante
 .github/workflows/doc-check.yaml @nickvigilante @jdomeracki-coder
 .github/workflows/docs-preview.yaml @nickvigilante @jdomeracki-coder
 .github/workflows/weekly-docs.yaml @nickvigilante @jdomeracki-coder
-.github/workflows/test-deploy-docs-diff.sh @nickvigilante @jdomeracki-coder
-.github/workflows/test-deploy-docs-release.sh @nickvigilante @jdomeracki-coder
 .github/workflows/test-docs-preview-mapper.sh @nickvigilante @jdomeracki-coder
