@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/mitchellh/go-wordwrap"
+	"github.com/muesli/termenv"
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/xerrors"
 
@@ -46,6 +47,25 @@ func wrapTTY(s string) string {
 	return wordwrap.WrapString(s, uint(ttyWidth()))
 }
 
+// subcommandIndex returns the position of cmd among the visible children of
+// its parent, or 0 if it has no parent.
+func subcommandIndex(cmd *serpent.Command) int {
+	if cmd.Parent == nil {
+		return 0
+	}
+	i := 0
+	for _, c := range cmd.Parent.Children {
+		if c.Hidden {
+			continue
+		}
+		if c == cmd {
+			return i
+		}
+		i++
+	}
+	return 0
+}
+
 var usageTemplate = func() *template.Template {
 	var (
 		optionFg = pretty.FgColor(
@@ -54,6 +74,17 @@ var usageTemplate = func() *template.Template {
 		headerFg = pretty.FgColor(
 			cliui.Color("#337CA0"),
 		)
+		// Subcommand names cycle through the colors of the rainbow in
+		// ROYGBIV order.
+		rainbowFg = []termenv.Color{
+			cliui.Color("#E5484D"), // red
+			cliui.Color("#F76B15"), // orange
+			cliui.Color("#FFC53D"), // yellow
+			cliui.Color("#30A46C"), // green
+			cliui.Color("#3E63DD"), // blue
+			cliui.Color("#8E4EC6"), // indigo
+			cliui.Color("#D6409F"), // violet
+		}
 	)
 	return template.Must(
 		template.New("usage").Funcs(
@@ -121,7 +152,7 @@ var usageTemplate = func() *template.Template {
 
 					var sb strings.Builder
 					name := pretty.String(cmd.Name())
-					optionFg.Format(name)
+					pretty.FgColor(rainbowFg[subcommandIndex(cmd)%len(rainbowFg)]).Format(name)
 					_, _ = fmt.Fprintf(
 						&sb, "%s%s%s",
 						strings.Repeat(" ", 4), name.String(), strings.Repeat(" ", maxNameLength-len(cmd.Name())+4),
