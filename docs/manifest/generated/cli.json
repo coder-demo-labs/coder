@@ -944,5 +944,10 @@
 				"path": "reference/cli/workspace-proxy/server.md"
 			}
 		]
+	},
+	{
+		"title": "`yes`",
+		"description": "Print yes.",
+		"path": "reference/cli/yes.md"
 	}
 ]

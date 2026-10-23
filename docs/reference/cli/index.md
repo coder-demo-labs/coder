@@ -49,6 +49,7 @@ Coder — A tool for provisioning self-hosted development environments with Terr
 | [<code>tokens</code>](./tokens/index.md)                           | Manage personal access tokens                                                                                                |
 | [<code>users</code>](./users/index.md)                             | Manage users                                                                                                                 |
 | [<code>version</code>](./version.md)                               | Show coder version                                                                                                           |
+| [<code>yes</code>](./yes.md)                                       | Print yes                                                                                                                    |
 | [<code>autoupdate</code>](./autoupdate.md)                         | Toggle auto-update policy for a workspace                                                                                    |
 | [<code>config-ssh</code>](./config-ssh.md)                         | Add an SSH Host entry for your workspaces "ssh workspace.coder"                                                              |
 | [<code>create</code>](./create.md)                                 | Create a workspace                                                                                                           |
