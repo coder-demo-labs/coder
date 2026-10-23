@@ -251,6 +251,19 @@ func (r *RootCmd) RunWithSubcommands(subcommands []*serpent.Command) {
 	}
 }
 
+// emotionReply returns the greeting for an emotion passed as `coder <emotion>`.
+func emotionReply(emotion string) (string, bool) {
+	switch strings.ToLower(emotion) {
+	case "happy":
+		return "Glad you're happy! Happy coding.", true
+	case "sad":
+		return "Sorry you're feeling sad. Hope coding cheers you up.", true
+	case "ambivalent":
+		return "Ambivalent? That's okay. Let's code anyway.", true
+	}
+	return "", false
+}
+
 func (r *RootCmd) Command(subcommands []*serpent.Command) (*serpent.Command, error) {
 	if r.clock == nil {
 		r.clock = quartz.NewReal()
@@ -282,6 +295,12 @@ func (r *RootCmd) Command(subcommands []*serpent.Command) (*serpent.Command, err
 			// to check if the command was invoked.
 			if gitauth.CheckCommand(i.Args, i.Environ.ToOS()) {
 				return gitAskpass(hiddenAgentAuth).Handler(i)
+			}
+			if len(i.Args) == 1 {
+				if reply, ok := emotionReply(i.Args[0]); ok {
+					_, err := fmt.Fprintln(i.Stdout, reply)
+					return err
+				}
 			}
 			return i.Command.HelpHandler(i)
 		},
