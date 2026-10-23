@@ -1,0 +1,39 @@
+name: Agent PR
+on:
+  push:
+    branches: ['claude/**']
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: agent-pr-${{ github.ref }}
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Open PR and notify Jira
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          BASE: ${{ github.event.repository.default_branch }}
+          JIRA_WEBHOOK_URL: ${{ secrets.JIRA_PR_WEBHOOK }}
+          JIRA_WEBHOOK_SECRET: ${{ secrets.JIRA_PR_WORKFLOW }}
+        run: |
+          set -euo pipefail
+          KEY=$(printf '%s' "$BRANCH" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n1 || true)
+          if [ -z "$KEY" ]; then echo "No issue key in $BRANCH; skipping"; exit 0; fi
+          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')" != "0" ]; then
+            echo "PR already open for $BRANCH"; exit 0
+          fi
+          SUBJECT=$(git log -1 --format=%s)
+          COMMITS=$(git log --format='- %s' "origin/$BASE..HEAD")
+          BODY=$(printf 'Agent work for %s.\n\nCommits:\n%s\n' "$KEY" "$COMMITS")
+          URL=$(gh pr create --base "$BASE" --head "$BRANCH" --title "$KEY: $SUBJECT" --body "$BODY")
+          jq -n --arg k "$KEY" --arg u "$URL" '{issues:[$k],data:{prUrl:$u}}' |
+            curl -fsS -X POST "$JIRA_PR_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -H "X-Automation-Webhook-Token: $JIRA_PR_WORKFLOW" \
+              --data @-
