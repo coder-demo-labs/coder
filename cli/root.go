@@ -110,6 +110,7 @@ func (r *RootCmd) CoreSubcommands() []*serpent.Command {
 	return []*serpent.Command{
 		r.completion(),
 		r.dotfiles(),
+		r.emotion(),
 		externalAuth(),
 		r.login(),
 		r.logout(),
